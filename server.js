@@ -9,6 +9,7 @@ require('dotenv').config();
 const app = express();
 const port = process.env.PORT || 5000;
 
+// Multer Storage Setup
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, 'uploads/');
@@ -17,22 +18,31 @@ const storage = multer.diskStorage({
     cb(null, `${Date.now()}-${file.originalname}`);
   }
 });
+
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
     if (!allowedTypes.includes(file.mimetype)) {
       return cb(new Error('Only PDF, DOC, or DOCX files are allowed'));
     }
     cb(null, true);
   },
-  limits: { fileSize: 4 * 1024 * 1024 } 
+  limits: { fileSize: 4 * 1024 * 1024 } // 4MB limit
 });
 
 // Middleware
 app.use(cors({
-  origin: 'http://localhost:3000'
+  origin: [
+    "http://localhost:3000",                   // Local development
+    "https://frontend-seven-omega-20.vercel.app" // Your deployed frontend
+  ],
 }));
+
 app.use(bodyParser.json());
 app.use(express.static('uploads'));
 
@@ -40,7 +50,7 @@ app.use(express.static('uploads'));
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 587,
-  secure: false, 
+  secure: false,
   auth: {
     user: process.env.GMAIL_USER,
     pass: process.env.GMAIL_APP_PASSWORD
@@ -56,7 +66,12 @@ transporter.verify((error, success) => {
   }
 });
 
-// Contact Form Endpoint (from previous setup)
+// ✅ Root Route (fixes "Cannot GET /")
+app.get("/", (req, res) => {
+  res.send("🚀 API is running! Use POST /api/send-email or /api/send-career-application");
+});
+
+// Contact Form Endpoint
 app.post('/api/send-email', async (req, res) => {
   const { name, email, subject, message, to_email } = req.body;
 
@@ -73,7 +88,7 @@ app.post('/api/send-email', async (req, res) => {
   const mailOptions = {
     from: `"${name}" <${process.env.GMAIL_USER}>`,
     to: to_email,
-    subject: subject,
+    subject,
     text: `Message from ${name} (${email}):\n\n${message}`,
     html: `<p><strong>From:</strong> ${name} (${email})</p><p><strong>Subject:</strong> ${subject}</p><p><strong>Message:</strong></p><p>${message}</p>`
   };
@@ -88,12 +103,11 @@ app.post('/api/send-email', async (req, res) => {
   }
 });
 
-
+// Career Application Endpoint
 app.post('/api/send-career-application', upload.single('resume'), async (req, res) => {
   const { jobType, position, fullName, phone, email, qualification, degree, experience, about, to_email } = req.body;
   const resume = req.file;
 
-  
   if (!jobType || !position || !fullName || !phone || !email || !qualification || !degree || !experience || !about || !to_email || !resume) {
     console.error('Validation failed:', { jobType, position, fullName, phone, email, qualification, degree, experience, about, to_email, resume });
     return res.status(400).json({ error: 'All fields and resume are required' });
@@ -109,7 +123,6 @@ app.post('/api/send-career-application', upload.single('resume'), async (req, re
     return res.status(400).json({ error: 'Invalid phone number' });
   }
 
- 
   const mailOptions = {
     from: `"${fullName}" <${process.env.GMAIL_USER}>`,
     to: to_email,
@@ -147,5 +160,5 @@ app.post('/api/send-career-application', upload.single('resume'), async (req, re
 
 // Start server
 app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
+  console.log(`✅ Server running on port ${port}`);
 });
