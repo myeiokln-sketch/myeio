@@ -3,32 +3,26 @@ const nodemailer = require('nodemailer');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const multer = require('multer');
-const path = require('path');
 require('dotenv').config();
 
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Multer Storage Setup
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/');
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  }
-});
-
+// Multer Memory Storage Setup
 const upload = multer({
   storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
-    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    const allowedTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    ];
     if (!allowedTypes.includes(file.mimetype)) {
       return cb(new Error('Only PDF, DOC, or DOCX files are allowed'));
     }
     cb(null, true);
   },
-  limits: { fileSize: 4 * 1024 * 1024 }
+  limits: { fileSize: 4 * 1024 * 1024 } // 4MB limit
 });
 
 // Middleware
@@ -38,9 +32,7 @@ app.use(cors({
     "https://frontend-seven-omega-20.vercel.app" // Your deployed frontend
   ],
 }));
-
 app.use(bodyParser.json());
-app.use(express.static('uploads'));
 
 // Configure Nodemailer with Gmail SMTP
 const transporter = nodemailer.createTransport({
@@ -62,7 +54,7 @@ transporter.verify((error, success) => {
   }
 });
 
-// ✅ Root Route (fixes "Cannot GET /")
+// ✅ Root Route
 app.get("/", (req, res) => {
   res.send("🚀 API is running! Use POST /api/send-email or /api/send-career-application");
 });
@@ -70,17 +62,14 @@ app.get("/", (req, res) => {
 // Contact Form Endpoint
 app.post('/api/send-email', async (req, res) => {
   const { name, email, subject, message, to_email } = req.body;
-
   if (!name || !email || !subject || !message || !to_email) {
     console.error('Validation failed:', { name, email, subject, message, to_email });
     return res.status(400).json({ error: 'All fields are required' });
   }
-
   if (!/\S+@\S+\.\S+/.test(email)) {
     console.error('Invalid email:', email);
     return res.status(400).json({ error: 'Invalid email address' });
   }
-
   const mailOptions = {
     from: `"${name}" <${process.env.GMAIL_USER}>`,
     to: to_email,
@@ -88,7 +77,6 @@ app.post('/api/send-email', async (req, res) => {
     text: `Message from ${name} (${email}):\n\n${message}`,
     html: `<p><strong>From:</strong> ${name} (${email})</p><p><strong>Subject:</strong> ${subject}</p><p><strong>Message:</strong></p><p>${message}</p>`
   };
-
   try {
     await transporter.sendMail(mailOptions);
     console.log('Email sent to:', to_email);
@@ -99,26 +87,22 @@ app.post('/api/send-email', async (req, res) => {
   }
 });
 
-// Career Application Endpoint
+// Career Application Endpoint (UPLOADS IN MEMORY)
 app.post('/api/send-career-application', upload.single('resume'), async (req, res) => {
   const { jobType, position, fullName, phone, email, qualification, degree, experience, about, to_email } = req.body;
   const resume = req.file;
-
   if (!jobType || !position || !fullName || !phone || !email || !qualification || !degree || !experience || !about || !to_email || !resume) {
     console.error('Validation failed:', { jobType, position, fullName, phone, email, qualification, degree, experience, about, to_email, resume });
     return res.status(400).json({ error: 'All fields and resume are required' });
   }
-
   if (!/\S+@\S+\.\S+/.test(email)) {
     console.error('Invalid email:', email);
     return res.status(400).json({ error: 'Invalid email address' });
   }
-
   if (!/^\+?\d{10,15}$/.test(phone.trim())) {
     console.error('Invalid phone:', phone);
     return res.status(400).json({ error: 'Invalid phone number' });
   }
-
   const mailOptions = {
     from: `"${fullName}" <${process.env.GMAIL_USER}>`,
     to: to_email,
@@ -139,11 +123,11 @@ app.post('/api/send-career-application', upload.single('resume'), async (req, re
     attachments: [
       {
         filename: resume.originalname,
-        path: resume.buffer
+        content: resume.buffer,
+        contentType: resume.mimetype
       }
     ]
   };
-
   try {
     await transporter.sendMail(mailOptions);
     console.log('Career application email sent to:', to_email);
