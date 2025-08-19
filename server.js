@@ -20,19 +20,15 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   fileFilter: (req, file, cb) => {
-    const allowedTypes = [
-      'application/pdf',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    ];
+    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
     if (!allowedTypes.includes(file.mimetype)) {
       return cb(new Error('Only PDF, DOC, or DOCX files are allowed'));
     }
     cb(null, true);
   },
-  limits: { fileSize: 4 * 1024 * 1024 } // 4MB limit
+  limits: { fileSize: 4 * 1024 * 1024 }
 });
 
 // Middleware
@@ -143,7 +139,7 @@ app.post('/api/send-career-application', upload.single('resume'), async (req, re
     attachments: [
       {
         filename: resume.originalname,
-        path: resume.path
+        path: resume.buffer
       }
     ]
   };
